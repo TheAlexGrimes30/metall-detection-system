@@ -1,0 +1,4 @@
+[project]
+name = "metal-detection-system"
+version = "1.0"
+dependencies = ["sqlalchemy==2.1.2", "fastapi==0.142.2", "uvicorn==0.54.0"]
