@@ -12,46 +12,49 @@ SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 TARGET_SIZE = (256, 256)
 TARGET_FORMAT = "PNG"
 
+NUM_CLASSES = 10
+
+CLASS_NAMES = [
+    "crease",
+    "crescent_gap",
+    "inclusion",
+    "oil_spot",
+    "punching_hole",
+    "rolled_pit",
+    "silk_spot",
+    "waist_folding",
+    "water_spot",
+    "welding_line",
+]
 
 # ============================================================
 # Loading
 # ============================================================
 
-def load_images_from_folder(folder: str) -> list[np.ndarray]:
-    """
-    Load all supported images from a folder.
-
-    Parameters
-    ----------
-    folder : str
-        Path to the folder with images.
-
-    Returns
-    -------
-    list[np.ndarray]
-        Loaded images.
-    """
+def load_images_from_folder(
+    folder: str
+) -> list[tuple[str, np.ndarray]]:
+    """Load supported images and preserve their filenames."""
     folder_path = Path(folder)
 
-    if not folder_path.exists():
+    if not folder_path.is_dir():
         raise FileNotFoundError(f"Folder not found: {folder}")
 
     images = []
 
-    for path in folder_path.iterdir():
+    for path in sorted(folder_path.iterdir()):
         if not path.is_file():
             continue
-
         if path.suffix.lower() not in SUPPORTED_EXTENSIONS:
             continue
 
-        image = cv2.imread(str(path))
+        image = cv2.imread(str(path), cv2.IMREAD_COLOR)
 
         if image is None:
-            print(f"Warning: could not read image: {path}")
+            print(f"Warning: cannot read image: {path}")
             continue
 
-        images.append(image)
+        images.append((path.name, image))
 
     return images
 
@@ -99,13 +102,18 @@ def normalize_image(image: np.ndarray) -> np.ndarray:
 
 def preprocess_image(image: np.ndarray) -> np.ndarray:
     """
-    Apply all preprocessing steps to one image.
+    Preprocess a GC10-DET image.
+
+    Steps:
+    1. Convert image to RGB.
+    2. Resize image to the target size.
+
+    Note:
+        Bounding box annotations must also be resized
+        using the same scale factors.
     """
     image = convert_to_rgb(image)
     image = resize_image(image, TARGET_SIZE)
-    image = remove_noise(image)
-    image = normalize_brightness(image)
-    image = adjust_contrast(image)
 
     return image
 
@@ -154,44 +162,42 @@ def save_images(
 
 def preprocess_folder(
     input_folder: str,
-    output_folder: str
+    labels_folder: str,
+    output_images_folder: str,
+    output_labels_folder: str
 ) -> None:
-    """
-    Load, preprocess and save all images from a folder.
-    """
-    input_path = Path(input_folder)
-    output_path = Path(output_folder)
+    """Preprocess GC10-DET images and preserve YOLO annotations."""
+    output_images = Path(output_images_folder)
+    output_labels = Path(output_labels_folder)
 
-    output_path.mkdir(parents=True, exist_ok=True)
+    output_images.mkdir(parents=True, exist_ok=True)
+    output_labels.mkdir(parents=True, exist_ok=True)
 
-    if not input_path.exists():
-        raise FileNotFoundError(f"Folder not found: {input_folder}")
+    images = load_images_from_folder(input_folder)
 
-    for path in input_path.iterdir():
-        if not path.is_file():
-            continue
+    for filename, image in images:
+        label_path = Path(labels_folder) / f"{Path(filename).stem}.txt"
 
-        if path.suffix.lower() not in SUPPORTED_EXTENSIONS:
-            continue
+        # Validate labels before saving anything for this image.
+        labels = validate_yolo_labels(label_path)
 
-        image = cv2.imread(str(path))
+        processed = preprocess_image(image)
 
-        if image is None:
-            print(f"Warning: could not read image: {path}")
-            continue
+        image_output = output_images / f"{Path(filename).stem}.png"
+        label_output = output_labels / f"{Path(filename).stem}.txt"
 
-        processed_image = preprocess_image(image)
+        # OpenCV expects BGR when writing.
+        processed_bgr = cv2.cvtColor(processed, cv2.COLOR_RGB2BGR)
 
-        output_file = output_path / f"{path.stem}.png"
+        if not cv2.imwrite(str(image_output), processed_bgr):
+            raise IOError(f"Could not save image: {image_output}")
 
-        # RGB -> BGR because OpenCV writes images in BGR order
-        processed_image = cv2.cvtColor(
-            processed_image,
-            cv2.COLOR_RGB2BGR
+        # Empty lists produce empty label files for negative examples.
+        label_output.write_text(
+            "\n".join(labels) + ("\n" if labels else "")
         )
 
-        cv2.imwrite(str(output_file), processed_image)
-
+    print(f"Processed {len(images)} images.")
 
 # ============================================================
 # Future preprocessing functions
@@ -235,3 +241,85 @@ def augment_image(image: np.ndarray) -> np.ndarray:
     """Apply data augmentation."""
     # TODO
     pass
+
+
+# ============================================================
+# YOLO related
+# ============================================================
+
+def validate_yolo_labels(
+    label_path: Path
+) -> list[str]:
+    """Read and validate YOLO bounding-box annotations."""
+    if not label_path.exists():
+        raise FileNotFoundError(f"Missing label file: {label_path}")
+
+    valid_lines = []
+
+    for line_number, line in enumerate(
+        label_path.read_text().splitlines(), start=1
+    ):
+        if not line.strip():
+            continue
+
+        parts = line.split()
+
+        if len(parts) != 5:
+            raise ValueError(
+                f"{label_path}:{line_number}: expected 5 values"
+            )
+
+        try:
+            class_id = int(parts[0])
+            x, y, width, height = map(float, parts[1:])
+        except ValueError as exc:
+            raise ValueError(
+                f"{label_path}:{line_number}: invalid annotation"
+            ) from exc
+
+        if not 0 <= class_id < NUM_CLASSES:
+            raise ValueError(
+                f"{label_path}:{line_number}: invalid class ID {class_id}"
+            )
+
+        if not all(
+            np.isfinite(v) and 0 <= v <= 1
+            for v in (x, y, width, height)
+        ):
+            raise ValueError(
+                f"{label_path}:{line_number}: coordinates must be in [0, 1]"
+            )
+
+        if width <= 0 or height <= 0:
+            raise ValueError(
+                f"{label_path}:{line_number}: box dimensions must be positive"
+            )
+
+        if x - width / 2 < -1e-6 or x + width / 2 > 1 + 1e-6:
+            raise ValueError(
+                f"{label_path}:{line_number}: box exceeds image bounds"
+            )
+
+        if y - height / 2 < -1e-6 or y + height / 2 > 1 + 1e-6:
+            raise ValueError(
+                f"{label_path}:{line_number}: box exceeds image bounds"
+            )
+
+        valid_lines.append(
+            f"{class_id} {x:.6f} {y:.6f} {width:.6f} {height:.6f}"
+        )
+
+    return valid_lines
+
+
+# ============================================================
+# Example
+# ============================================================
+
+# if __name__ == "__main__":
+#     preprocess_folder(
+#         input_folder="dataset/images/train",
+#         labels_folder="dataset/labels/train",
+#         output_images_folder="processed/images/train",
+#         output_labels_folder="processed/labels/train",
+#     )
