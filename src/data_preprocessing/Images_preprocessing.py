@@ -64,6 +64,12 @@ def convert_to_rgb(image: np.ndarray) -> np.ndarray:
     """
     Convert image to RGB color space.
     """
+    if image.ndim == 2:
+        return cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+
+    if image.shape[2] == 4:
+        return cv2.cvtColor(image, cv2.COLOR_BGRA2RGB)
+
     return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
 
@@ -96,10 +102,10 @@ def preprocess_image(image: np.ndarray) -> np.ndarray:
     Apply all preprocessing steps to one image.
     """
     image = convert_to_rgb(image)
-    image = resize_image(image)
-
-    # TODO:
-    # image = normalize_image(image)
+    image = resize_image(image, TARGET_SIZE)
+    image = remove_noise(image)
+    image = normalize_brightness(image)
+    image = adjust_contrast(image)
 
     return image
 
@@ -108,16 +114,27 @@ def preprocess_image(image: np.ndarray) -> np.ndarray:
 # Saving
 # ============================================================
 
-def save_image(
-    image: np.ndarray,
-    output_path: str,
-    image_format: str = TARGET_FORMAT
+def save_images(
+    images: list[tuple[str, np.ndarray]],
+    output_folder: str
 ) -> None:
     """
-    Save processed image in the target format.
+    Save all processed images to a folder.
     """
-    # TODO
-    pass
+    output_path = Path(output_folder)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    for filename, image in images:
+        output_file = output_path / f"{Path(filename).stem}.png"
+
+        # OpenCV expects BGR rather than RGB
+        if image.ndim == 3 and image.shape[2] == 3:
+            image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+
+        success = cv2.imwrite(str(output_file), image)
+
+        if not success:
+            print(f"Warning: could not save image: {output_file}")
 
 
 def save_images(
@@ -182,20 +199,30 @@ def preprocess_folder(
 
 def remove_noise(image: np.ndarray) -> np.ndarray:
     """Remove image noise."""
-    # TODO
-    pass
+    return cv2.GaussianBlur(
+        image,
+        ksize=(3, 3),
+        sigmaX=0
+    )
 
 
 def adjust_contrast(image: np.ndarray) -> np.ndarray:
     """Adjust image contrast."""
-    # TODO
-    pass
+    alpha = 1.2  # Contrast factor
+    beta = 0     # Brightness offset
+
+    return cv2.convertScaleAbs(image, alpha=alpha, beta=beta)
 
 
 def normalize_brightness(image: np.ndarray) -> np.ndarray:
     """Normalize image brightness."""
-    # TODO
-    pass
+    return cv2.normalize(
+        image,
+        None,
+        alpha=0,
+        beta=255,
+        norm_type=cv2.NORM_MINMAX
+    )
 
 
 def crop_image(image: np.ndarray) -> np.ndarray:
