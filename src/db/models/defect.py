@@ -1,7 +1,13 @@
+from typing import TYPE_CHECKING
+
 from sqlalchemy import Integer, Float, Boolean, ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column, relationship, backref
+from sqlalchemy.orm import Mapped, mapped_column, relationship, WriteOnlyMapped
 
 from ..db_session import DBBase
+
+if TYPE_CHECKING:
+    from .defect_type import DefectType
+    from .inspection import Inspection
 
 
 class Defect(DBBase):
@@ -9,16 +15,16 @@ class Defect(DBBase):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     type_id: Mapped[int] = mapped_column(ForeignKey('defect_type.id'))
-    type = relationship(
+    type: WriteOnlyMapped['DefectType'] = relationship(
         'DefectType',
         foreign_keys=type_id,
-        backref=backref('defects', lazy='dynamic')
+        back_populates='defects'
     )
     inspection_id: Mapped[int] = mapped_column(ForeignKey('inspection.id'))
-    inspection = relationship(
+    inspection: WriteOnlyMapped['Inspection'] = relationship(
         'Inspection',
         foreign_keys=inspection_id,
-        backref=backref('defects', lazy='dynamic')
+        back_populates='defects'
     )
     bbox_x: Mapped[int] = mapped_column(Integer, nullable=False)
     bbox_y: Mapped[int] = mapped_column(Integer, nullable=False)

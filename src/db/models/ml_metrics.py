@@ -1,9 +1,14 @@
+from typing import TYPE_CHECKING
+
 from datetime import datetime, UTC
 
 from sqlalchemy import Integer, Float, DateTime, Boolean, ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column, relationship, backref
+from sqlalchemy.orm import Mapped, mapped_column, relationship, WriteOnlyMapped
 
 from ..db_session import DBBase
+
+if TYPE_CHECKING:
+    from .ml_model import MLModel
 
 
 class MLMetrics(DBBase):
@@ -11,12 +16,11 @@ class MLMetrics(DBBase):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     ml_model_id: Mapped[int] = mapped_column(ForeignKey('ml_model.id'))
-    ml_model = relationship(
+    ml_model: WriteOnlyMapped['MLModel'] = relationship(
         'MLModel',
         foreign_keys=ml_model_id,
-        backref=backref('metrics', lazy='dynamic')
+        back_populates='metrics'
     )
-    ml_model_version: Mapped[int] = mapped_column(Integer, nullable=False)
     iou: Mapped[float] = mapped_column(Float, nullable=False)
     precision: Mapped[float] = mapped_column(Float, nullable=False)
     recall: Mapped[float] = mapped_column(Float, nullable=False)
