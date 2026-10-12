@@ -1,9 +1,16 @@
+from typing import TYPE_CHECKING
+
 from datetime import datetime, UTC
 
 from sqlalchemy import Integer, String, DateTime, ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, WriteOnlyMapped
 
 from ..db_session import DBBase
+
+if TYPE_CHECKING:
+    from .user import User
+    from .inspection import Inspection
+    from .ml_model import MLModel
 
 
 class Log(DBBase):
@@ -16,13 +23,25 @@ class Log(DBBase):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     
     user_id: Mapped[int] = mapped_column(ForeignKey('user.id'))
-    user = relationship('User', foreign_keys=user_id, backref='logs')
+    user: WriteOnlyMapped['User'] = relationship(
+        'User',
+        foreign_keys=user_id,
+        back_populates='logs'
+    )
     
     inspection_id: Mapped[int] = mapped_column(ForeignKey('inspection.id'))
-    inspection = relationship('Inspection', foreign_keys=inspection_id, backref='logs')
+    inspection: WriteOnlyMapped['Inspection'] = relationship(
+        'Inspection',
+        foreign_keys=inspection_id,
+        back_populates='logs'
+    )
 
     ml_model_id: Mapped[int] = mapped_column(ForeignKey('ml_model.id'))
-    ml_model = relationship('MLModel', foreign_keys=ml_model_id, backref='logs')
+    ml_model: WriteOnlyMapped['MLModel'] = relationship(
+        'MLModel',
+        foreign_keys=ml_model_id,
+        back_populates='logs'
+    )
 
     event: Mapped[str] = mapped_column(String, nullable=False)
     dt: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(UTC))

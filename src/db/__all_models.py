@@ -7,8 +7,6 @@ from .models.ml_model import MLModel
 from .models.ml_metrics import MLMetrics
 from .models.log import Log
 
-# TODO: use lazy='dynamic' in all backrefs
-
 __all__ = [
     'User', 'Inspection', 'Image', 'ImageType',
     'DefectType', 'Defect', 'MLModel', 'MLMetrics', 'Log'

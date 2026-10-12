@@ -1,11 +1,13 @@
 from typing import Optional
 
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import DeclarativeBase, Session
 from sqlalchemy.pool import NullPool
 
-DBBase = declarative_base()
+
+class DBBase(DeclarativeBase):
+    pass
+
 __factory = None
 
 
@@ -17,7 +19,7 @@ def global_init(url: str):
     if not url:
         raise Exception('Некорректный адрес БД')
     engine = create_engine(url, echo=False, poolclass=NullPool)
-    __factory = sessionmaker(bind=engine)
+    __factory = lambda: Session(engine)
     from . import __all_models # type: ignore
     DBBase.metadata.create_all(engine)
 
