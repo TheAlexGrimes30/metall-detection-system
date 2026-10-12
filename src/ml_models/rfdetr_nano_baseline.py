@@ -9,25 +9,20 @@ from rfdetr.util.coco_classes import COCO_CLASSES
 
 IMAGE_PATH = "images/test_photo_cat.jpg"
 OUTPUT_PATH = "outputs/rfdetr/test_photo_cat.jpg"
-WEIGHTS_PATH = "models/rfdetr_nano.pth"
+WEIGHTS_PATH = "models/rf-detr-nano.pth"
 
 Path("outputs/rfdetr").mkdir(parents=True, exist_ok=True)
 
-
 model = RFDETRNano(
-    # pretrain_weights="./rfdetr_nano.pth"
+    pretrain_weights=WEIGHTS_PATH
 )
 
 image = Image.open(IMAGE_PATH).convert("RGB")
 
 detections = model.predict(
     image,
-    threshold=0.05
+    threshold=0.01
 )
-
-print(detections)
-print("Number of detections:", len(detections))
-
 
 labels = [
     f"{COCO_CLASSES[class_id]} {confidence:.2f}"
@@ -37,33 +32,26 @@ labels = [
     )
 ]
 
-for class_id, confidence, box in zip(
-    detections.class_id,
-    detections.confidence,
-    detections.xyxy
-):
-    print(
-        f"Class: {COCO_CLASSES[class_id]}, "
-        f"Confidence: {confidence:.4f}, "
-        f"Box: {box}"
-    )
-
-
-annotated = image.copy()
-
 annotated = sv.BoxAnnotator(
-    thickness=3
+    thickness=2
 ).annotate(
-    annotated,
-    detections
+    scene=image.copy(),
+    detections=detections
 )
 
 annotated = sv.LabelAnnotator().annotate(
-    annotated,
-    detections,
-    labels
+    scene=annotated,
+    detections=detections,
+    labels=labels
 )
 
 annotated.save(OUTPUT_PATH)
+
+for class_id, confidence in zip(
+    detections.class_id,
+    detections.confidence
+):
+    print(f"Class: {COCO_CLASSES[class_id]}")
+    print(f"Confidence: {confidence:.4f}")
 
 print(f"Saved to: {OUTPUT_PATH}")
