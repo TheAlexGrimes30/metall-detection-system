@@ -2,9 +2,9 @@ from datetime import datetime, UTC
 import uuid
 import enum
 
-from sqlalchemy import String, DateTime, ForeignKey, Enum
+from sqlalchemy import String, DateTime, Boolean, ForeignKey, Enum
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, backref
 
 from ..db_session import DBBase
 
@@ -20,12 +20,21 @@ class Image(DBBase):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[int] = mapped_column(ForeignKey('user.id'))
-    user = relationship('User', foreign_keys=user_id, backref='images')
+    user = relationship(
+        'User',
+        foreign_keys=user_id,
+        backref=backref('images', lazy='dynamic')
+    )
     type: Mapped[enum.Enum] = mapped_column(Enum(ImageType), default=ImageType.ORIGINAL)
     original_image_id: Mapped[int] = mapped_column(ForeignKey('image.id'))
-    original_image = relationship('Image', foreign_keys=original_image_id, backref='derivative_images')
+    original_image = relationship(
+        'Image',
+        foreign_keys=original_image_id,
+        backref=backref('derivative_images', lazy='dynamic')
+    )
     metadata: Mapped[str] = mapped_column(String, nullable=True)
     dt_uploaded: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     # backref relations
     # derivative_images: 1:M relation from Image
