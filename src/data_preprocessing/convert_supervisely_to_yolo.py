@@ -123,6 +123,152 @@ def convert_supervisely_to_yolo(
         print(f"  {name}: {class_counter[name]}")
 
 
+def run_self_test() -> bool:
+    """
+    End-to-end self-test: create synthetic Supervisely JSON,
+    convert to YOLO, then validate with the EDA validator.
+    Returns True if all checks pass.
+    """
+    import tempfile
+    from pathlib import Path
+
+    NUM_CLASSES = len(CLASS_NAMES)
+
+    # Create a minimal synthetic annotation matching GC10-DET structure
+    test_json = {
+        "description": "",
+        "tags": [],
+        "size": {"height": 1000, "width": 2048},
+        "objects": [
+            {
+                "id": 1,
+                "classId": 1,
+                "description": "",
+                "geometryType": "rectangle",
+                "labelerLogin": "test",
+                "createdAt": "2024-01-01T00:00:00.000Z",
+                "updatedAt": "2024-01-01T00:00:00.000Z",
+                "tags": [],
+                "classTitle": "inclusion",
+                "points": {
+                    "exterior": [[100, 200], [300, 400]],
+                    "interior": []
+                }
+            },
+            {
+                "id": 2,
+                "classId": 2,
+                "description": "",
+                "geometryType": "rectangle",
+                "labelerLogin": "test",
+                "createdAt": "2024-01-01T00:00:00.000Z",
+                "updatedAt": "2024-01-01T00:00:00.000Z",
+                "tags": [],
+                "classTitle": "punching_hole",
+                "points": {
+                    "exterior": [[500, 600], [800, 900]],
+                    "interior": []
+                }
+            },
+            # Test edge case: box extending beyond image boundary
+            {
+                "id": 3,
+                "classId": 3,
+                "description": "",
+                "geometryType": "rectangle",
+                "labelerLogin": "test",
+                "createdAt": "2024-01-01T00:00:00.000Z",
+                "updatedAt": "2024-01-01T00:00:00.000Z",
+                "tags": [],
+                "classTitle": "oil_spot",
+                "points": {
+                    "exterior": [[-50, -50], [2100, 1100]],  # Outside image bounds
+                    "interior": []
+                }
+            },
+        ]
+    }
+
+    # Create temp directories
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir = Path(tmpdir)
+        images_dir = tmpdir / "images"
+        ann_dir = tmpdir / "ann"
+        output_dir = tmpdir / "labels"
+
+        images_dir.mkdir()
+        ann_dir.mkdir()
+
+        # Write test JSON
+        ann_file = ann_dir / "test_image.jpg.json"
+        ann_file.write_text(json.dumps(test_json))
+
+        # Create dummy image file (just for stem matching)
+        (images_dir / "test_image.jpg").write_bytes(b"fake")
+
+        # Run conversion
+        convert_supervisely_to_yolo(str(images_dir), str(ann_dir), str(output_dir))
+
+        # Verify output
+        label_file = output_dir / "test_image.txt"
+        if not label_file.exists():
+            print("FAIL: Label file not created")
+            return False
+
+        lines = label_file.read_text().strip().splitlines()
+        if len(lines) != 3:
+            print(f"FAIL: Expected 3 boxes, got {len(lines)}")
+            return False
+
+        # Validate each line matches YOLO format and bounds
+        for i, line in enumerate(lines):
+            parts = line.split()
+            if len(parts) != 5:
+                print(f"FAIL: Line {i} has {len(parts)} parts, expected 5")
+                return False
+
+            class_id = int(parts[0])
+            x, y, w, h = map(float, parts[1:])
+
+            # Check bounds
+            if not (0 <= class_id < NUM_CLASSES):
+                print(f"FAIL: Line {i} invalid class_id {class_id}")
+                return False
+            if not (0 <= x <= 1 and 0 <= y <= 1 and 0 <= w <= 1 and 0 <= h <= 1):
+                print(f"FAIL: Line {i} coords out of bounds: x={x}, y={y}, w={w}, h={h}")
+                return False
+            if w <= 0 or h <= 0:
+                print(f"FAIL: Line {i} zero/negative size: w={w}, h={h}")
+                return False
+
+            # Check box within image bounds (with epsilon)
+            eps = 1e-6
+            if x - w/2 < -eps or x + w/2 > 1+eps or y - h/2 < -eps or y + h/2 > 1+eps:
+                print(f"FAIL: Line {i} box exceeds image bounds")
+                return False
+
+        # Verify class mapping
+        expected_classes = [2, 4, 3]  # inclusion, punching_hole, oil_spot
+        actual_classes = [int(l.split()[0]) for l in lines]
+        if actual_classes != expected_classes:
+            print(f"FAIL: Class IDs mismatch. Expected {expected_classes}, got {actual_classes}")
+            return False
+
+        # Verify the edge-case box was clamped correctly
+        # The oil_spot box was [[-50, -50], [2100, 1100]] -> should become full image [0,0] to [2047,999]
+        oil_spot_line = lines[2]
+        _, x, y, w, h = oil_spot_line.split()
+        x, y, w, h = float(x), float(y), float(w), float(h)
+        # Should be centered at ~0.5, 0.5 with width/height ~1.0
+        if not (abs(x - 0.5) < 0.01 and abs(y - 0.5) < 0.01 and abs(w - 1.0) < 0.01 and abs(h - 1.0) < 0.01):
+            print(f"FAIL: Edge-case clamping failed. Got x={x:.3f}, y={y:.3f}, w={w:.3f}, h={h:.3f}")
+            return False
+
+        print("SUCCESS: All self-test checks passed!")
+        print(f"  Generated labels: {lines}")
+        return True
+
+
 if __name__ == "__main__":
     import argparse
 
@@ -138,5 +284,12 @@ if __name__ == "__main__":
         "--self-test", action="store_true", help="Run end-to-end self-test"
     )
     args = parser.parse_args()
+
+    if args.self_test:
+        success = run_self_test()
+        exit(0 if success else 1)
+
+    if not (args.images and args.ann and args.output):
+        parser.error("--images, --ann, and --output are required unless --self-test is used")
 
     convert_supervisely_to_yolo(args.images, args.ann, args.output)
