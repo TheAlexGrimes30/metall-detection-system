@@ -24,7 +24,7 @@ EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff"}
 # ============================================================
 
 def find_images(root):
-    excluded = {"eda_results", "processed", "runs", ".git"}
+    excluded = {"eda_results", "processed", "processed_dataset", "runs", ".git"}
 
     return sorted(
         p for p in root.rglob("*")
