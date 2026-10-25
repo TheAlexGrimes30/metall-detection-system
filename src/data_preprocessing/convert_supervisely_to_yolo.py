@@ -81,19 +81,32 @@ def convert_supervisely_to_yolo(
             x1, y1 = points[0]
             x2, y2 = points[1]
 
-            # Convert to YOLO format (normalized center x, y, width, height)
-            x_center = ((x1 + x2) / 2) / img_width
-            y_center = ((y1 + y2) / 2) / img_height
-            width = abs(x2 - x1) / img_width
-            height = abs(y2 - y1) / img_height
+            # Clamp corner coordinates to image boundaries FIRST
+            x1 = max(0, min(img_width - 1, x1))
+            y1 = max(0, min(img_height - 1, y1))
+            x2 = max(0, min(img_width - 1, x2))
+            y2 = max(0, min(img_height - 1, y2))
 
-            # Clamp to [0, 1]
-            x_center = max(0, min(1, x_center))
-            y_center = max(0, min(1, y_center))
-            width = max(0, min(1, width))
-            height = max(0, min(1, height))
+            # Ensure x1 < x2, y1 < y2 after clamping
+            x_min, x_max = min(x1, x2), max(x1, x2)
+            y_min, y_max = min(y1, y2), max(y1, y2)
 
-            if width > 0 and height > 0:
+            box_w = x_max - x_min
+            box_h = y_max - y_min
+
+            if box_w > 0 and box_h > 0:
+                # Convert to YOLO format (normalized center x, y, width, height)
+                x_center = ((x_min + x_max) / 2) / img_width
+                y_center = ((y_min + y_max) / 2) / img_height
+                width = box_w / img_width
+                height = box_h / img_height
+
+                # Final safety clamp (should already be in [0,1] after corner clamping)
+                x_center = max(0.0, min(1.0, x_center))
+                y_center = max(0.0, min(1.0, y_center))
+                width = max(0.0, min(1.0, width))
+                height = max(0.0, min(1.0, height))
+
                 yolo_lines.append(
                     f"{class_id} {x_center:.6f} {y_center:.6f} {width:.6f} {height:.6f}"
                 )
@@ -116,10 +129,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Convert Supervisely JSON to YOLO format"
     )
-    parser.add_argument("--images", required=True, help="Path to images folder")
-    parser.add_argument("--ann", required=True, help="Path to annotations folder")
+    parser.add_argument("--images", required=False, help="Path to images folder")
+    parser.add_argument("--ann", required=False, help="Path to annotations folder")
     parser.add_argument(
-        "--output", required=True, help="Output labels folder (YOLO format)"
+        "--output", required=False, help="Output labels folder (YOLO format)"
+    )
+    parser.add_argument(
+        "--self-test", action="store_true", help="Run end-to-end self-test"
     )
     args = parser.parse_args()
 
