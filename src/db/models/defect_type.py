@@ -16,7 +16,7 @@ class DefectType(DBBase):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     type: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     defects: WriteOnlyMapped['Defect'] = relationship(
-        'Defect', back_populates='defect_type'
+        'Defect', back_populates='type'
     )
     dt_created: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=lambda: datetime.now(UTC)

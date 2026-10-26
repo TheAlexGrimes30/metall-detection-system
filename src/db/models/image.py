@@ -27,12 +27,12 @@ class Image(DBBase):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     user_id: Mapped[int] = mapped_column(ForeignKey('user.id'))
-    user: WriteOnlyMapped['User'] = relationship(
+    user: Mapped['User'] = relationship(
         'User', foreign_keys=user_id, back_populates='images'
     )
     type: Mapped[ImageType] = mapped_column(Enum(ImageType), default=ImageType.ORIGINAL)
-    original_image_id: Mapped[int] = mapped_column(ForeignKey('image.id'))
-    original_image: WriteOnlyMapped['Image'] = relationship(
+    original_image_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('image.id'))
+    original_image: Mapped['Image'] = relationship(
         'Image', foreign_keys=original_image_id, back_populates='derivative_images'
     )
     derivative_images: WriteOnlyMapped['Image'] = relationship(

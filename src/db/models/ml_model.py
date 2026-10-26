@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, WriteOnlyMapped, mapped_column, relationship
 from ..db_session import DBBase
 
 if TYPE_CHECKING:
+    from .inspection import Inspection
     from .log import Log
     from .ml_metrics import MLMetrics
 
@@ -28,6 +29,9 @@ class MLModel(DBBase):
 
     ml_metrics: WriteOnlyMapped['MLMetrics'] = relationship(
         'MLMetrics', back_populates='ml_model'
+    )
+    inspections: WriteOnlyMapped['Inspection'] = relationship(
+        'Inspection', back_populates='ml_model'
     )
     logs: WriteOnlyMapped['Log'] = relationship('Log', back_populates='ml_model')
 

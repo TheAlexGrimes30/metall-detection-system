@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String
-from sqlalchemy.orm import Mapped, WriteOnlyMapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..db_session import DBBase
 
@@ -22,17 +22,17 @@ class Log(DBBase):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
     user_id: Mapped[int] = mapped_column(ForeignKey('user.id'))
-    user: WriteOnlyMapped['User'] = relationship(
+    user: Mapped['User'] = relationship(
         'User', foreign_keys=user_id, back_populates='logs'
     )
 
     inspection_id: Mapped[int] = mapped_column(ForeignKey('inspection.id'))
-    inspection: WriteOnlyMapped['Inspection'] = relationship(
+    inspection: Mapped['Inspection'] = relationship(
         'Inspection', foreign_keys=inspection_id, back_populates='logs'
     )
 
     ml_model_id: Mapped[int] = mapped_column(ForeignKey('ml_model.id'))
-    ml_model: WriteOnlyMapped['MLModel'] = relationship(
+    ml_model: Mapped['MLModel'] = relationship(
         'MLModel', foreign_keys=ml_model_id, back_populates='logs'
     )
 

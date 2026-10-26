@@ -1,3 +1,4 @@
+import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -17,16 +18,16 @@ class Inspection(DBBase):
     __tablename__ = 'inspection'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    image_in_id: Mapped[int] = mapped_column(ForeignKey('image.id'))
-    image_in: WriteOnlyMapped['Image'] = relationship(
+    image_in_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('image.id'))
+    image_in: Mapped['Image'] = relationship(
         'Image', foreign_keys=image_in_id, back_populates='inspections_in'
     )
-    image_out_id: Mapped[int] = mapped_column(ForeignKey('image.id'), nullable=True)
-    image_out: WriteOnlyMapped['Image'] = relationship(
+    image_out_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('image.id'), nullable=True)
+    image_out: Mapped['Image'] = relationship(
         'Image', foreign_keys=image_out_id, back_populates='inspections_out'
     )
     ml_model_id: Mapped[int] = mapped_column(ForeignKey('ml_model.id'))
-    ml_model: WriteOnlyMapped['MLModel'] = relationship(
+    ml_model: Mapped['MLModel'] = relationship(
         'MLModel', foreign_keys=ml_model_id, back_populates='inspections'
     )
     defects: WriteOnlyMapped['Defect'] = relationship(
