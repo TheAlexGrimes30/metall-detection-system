@@ -1,6 +1,9 @@
 from pathlib import Path
 import cv2
 import numpy as np
+import random
+from typing import Optional
+from sklearn.model_selection import train_test_split
 
 
 # ============================================================
@@ -27,6 +30,14 @@ CLASS_NAMES = [
     "welding_line",
 ]
 
+# Dataset statistics from EDA (grayscale)
+DATASET_MEAN = 85.695
+DATASET_STD = 25.074
+
+# Classes needing special augmentation (small objects)
+SMALL_OBJECT_CLASSES = {2, 4}  # inclusion, punching_hole
+
+
 # ============================================================
 # Loading
 # ============================================================
@@ -48,7 +59,7 @@ def load_images_from_folder(
         if path.suffix.lower() not in SUPPORTED_EXTENSIONS:
             continue
 
-        image = cv2.imread(str(path), cv2.IMREAD_COLOR)
+        image = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
 
         if image is None:
             print(f"Warning: cannot read image: {path}")
@@ -59,45 +70,64 @@ def load_images_from_folder(
     return images
 
 
+def load_yolo_labels(label_path: Path) -> list[list[float]]:
+    """Load YOLO format labels: class_id, x_center, y_center, width, height."""
+    if not label_path.exists():
+        return []
+
+    labels = []
+    for line in label_path.read_text().splitlines():
+        if not line.strip():
+            continue
+        parts = line.split()
+        if len(parts) == 5:
+            labels.append([float(p) for p in parts])
+    return labels
+
+
+def save_yolo_labels(labels: list[list[float]], label_path: Path) -> None:
+    """Save YOLO format labels."""
+    lines = [f"{int(l[0])} {l[1]:.6f} {l[2]:.6f} {l[3]:.6f} {l[4]:.6f}" for l in labels]
+    label_path.write_text("\n".join(lines) + ("\n" if lines else ""))
+
+
 # ============================================================
 # Preprocessing
 # ============================================================
 
-def convert_to_rgb(image: np.ndarray) -> np.ndarray:
-    """
-    Convert image to RGB color space.
-    """
+def convert_to_grayscale(image: np.ndarray) -> np.ndarray:
+    """Convert image to single-channel grayscale."""
     if image.ndim == 2:
-        return cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
-
+        return image
     if image.shape[2] == 4:
-        return cv2.cvtColor(image, cv2.COLOR_BGRA2RGB)
-
-    return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        return cv2.cvtColor(image, cv2.COLOR_BGRA2GRAY)
+    if image.shape[2] == 3:
+        return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    return image
 
 
 def resize_image(
     image: np.ndarray,
     size: tuple[int, int] = TARGET_SIZE
 ) -> np.ndarray:
-    """
-    Resize image to the target size.
-    """
+    """Resize image to the target size."""
     return cv2.resize(image, size)
 
 
 def normalize_image(image: np.ndarray) -> np.ndarray:
     """
-    Normalize image.
-
-    Placeholder for future preprocessing:
-    - pixel normalization
-    - contrast normalization
-    - histogram equalization
-    - etc.
+    Normalize image using dataset statistics: (image - mean) / std.
+    Input: uint8 [0, 255], Output: float32 normalized.
     """
-    # TODO
-    pass
+    image = image.astype(np.float32)
+    image = (image - DATASET_MEAN) / DATASET_STD
+    return image
+
+
+def denormalize_image(image: np.ndarray) -> np.ndarray:
+    """Denormalize for visualization: (image * std) + mean -> uint8."""
+    image = image * DATASET_STD + DATASET_MEAN
+    return np.clip(image, 0, 255).astype(np.uint8)
 
 
 def preprocess_image(image: np.ndarray) -> np.ndarray:
