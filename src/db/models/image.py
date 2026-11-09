@@ -33,16 +33,17 @@ class Image(DBBase):
     type: Mapped[ImageType] = mapped_column(Enum(ImageType), default=ImageType.ORIGINAL)
     original_image_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('image.id'))
     original_image: Mapped['Image'] = relationship(
-        'Image', foreign_keys=original_image_id, back_populates='derivative_images'
+        'Image', foreign_keys=original_image_id, remote_side=[id],
+        back_populates='derivative_images'
     )
     derivative_images: WriteOnlyMapped['Image'] = relationship(
         'Image', back_populates='original_image'
     )
     inspections_in: WriteOnlyMapped['Inspection'] = relationship(
-        'Inspection', back_populates='image_in'
+        'Inspection', foreign_keys='Inspection.image_in_id', back_populates='image_in'
     )
     inspections_out: WriteOnlyMapped['Inspection'] = relationship(
-        'Inspection', back_populates='image_out'
+        'Inspection', foreign_keys='Inspection.image_out_id', back_populates='image_out'
     )
     metadata_: Mapped[str] = mapped_column(String, nullable=True)
     dt_uploaded: Mapped[datetime] = mapped_column(
