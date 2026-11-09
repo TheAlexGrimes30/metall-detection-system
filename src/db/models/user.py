@@ -1,9 +1,8 @@
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from datetime import datetime, UTC
-
-from sqlalchemy import Integer, String, DateTime, Boolean
-from sqlalchemy.orm import Mapped, mapped_column, WriteOnlyMapped, relationship
+from sqlalchemy import Boolean, DateTime, Integer, String
+from sqlalchemy.orm import Mapped, WriteOnlyMapped, mapped_column, relationship
 
 from ..db_session import DBBase
 
@@ -20,5 +19,7 @@ class User(DBBase):
     password_hash: Mapped[str] = mapped_column(String, nullable=False)
     images: WriteOnlyMapped['Image'] = relationship('Image', back_populates='user')
     logs: WriteOnlyMapped['Log'] = relationship('Log', back_populates='user')
-    dt_created: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+    dt_created: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC)
+    )
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

@@ -1,4 +1,17 @@
 [project]
 name = "metal-detection-system"
 version = "1.0"
-dependencies = ["sqlalchemy==2.1.2", "fastapi==0.142.2", "uvicorn==0.54.0"]
+requires-python = ">=3.12"
+dependencies = [
+    "sqlalchemy==2.1.2",
+    "fastapi==0.142.2",
+    "uvicorn==0.54.0",
+    "asyncpg>=0.32.0",
+    "alembic>=1.20.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.17.2",
+]
