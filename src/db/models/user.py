@@ -15,7 +15,7 @@ class User(DBBase):
     __tablename__ = 'user'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String, nullable=False)
     images: WriteOnlyMapped['Image'] = relationship('Image', back_populates='user')
     logs: WriteOnlyMapped['Log'] = relationship('Log', back_populates='user')

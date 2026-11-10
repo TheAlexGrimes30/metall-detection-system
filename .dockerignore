@@ -1,0 +1,13 @@
+.git
+.env
+.env.*
+.venv
+.idea
+__pycache__
+**/__pycache__
+.pytest_cache
+.ruff_cache
+architectures
+eda_results
+processed_dataset
+frontend
