@@ -1,0 +1,12 @@
+{
+  "dataset": "severstal_detection/v1",
+  "image_counts": {
+    "train": 8804,
+    "val": 1881,
+    "test": 1883
+  },
+  "negative_images": 5902,
+  "total_boxes": 19958,
+  "source_manifest_sha256": "7bdb5c7f4b19e23be5eadd1313918753712575a216902e67b4b83dd9bb0535ae",
+  "source_components_sha256": "15f5ecbd4b887a22414fc6ea2bb873970524f1da0ecc4d8ca1644a995435df6f"
+}

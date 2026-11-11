@@ -1,0 +1,4 @@
+split,images,negative_images,boxes
+train,8804,4131,14001
+val,1881,886,2990
+test,1883,885,2967

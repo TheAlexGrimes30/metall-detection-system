@@ -1,0 +1,8 @@
+train: images/train
+val: images/val
+test: images/test
+names:
+  0: defect_1
+  1: defect_2
+  2: defect_3
+  3: defect_4
